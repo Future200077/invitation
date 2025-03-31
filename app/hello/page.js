@@ -10,12 +10,11 @@ export default function HelloPage() {
   const [savedUsers, setSavedUsers] = useState([]);
   const [showExtraFields, setShowExtraFields] = useState(false);
   const [showSavedUsers, setShowSavedUsers] = useState(false);
-  const [forceUpdate, setForceUpdate] = useState(0); // Force component re-render
 
   // Pagination for GitHub users
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const usersPerPage = 10;
+  const usersPerPage = 100;
 
   // Pagination for Saved Users
   const [savedPage, setSavedPage] = useState(1);
@@ -37,9 +36,9 @@ export default function HelloPage() {
     setShowExtraFields(true);
   };
 
-  // Fetch users based on location
+  // Fetch GitHub users based on location
   const fetchUsers = async () => {
-    if (!location) return;
+    if (!location.trim()) return;
     setLoading(true);
     setUsers([]);
 
@@ -48,6 +47,9 @@ export default function HelloPage() {
         `https://api.github.com/search/users?q=location:${location}&per_page=${usersPerPage}&page=${page}`
       );
       const data = await res.json();
+      console.log(data)
+      console.log(data.items)
+
       if (data.items) {
         setUsers(data.items);
         setTotalPages(Math.ceil(data.total_count / usersPerPage));
@@ -60,58 +62,9 @@ export default function HelloPage() {
 
   useEffect(() => {
     if (location) fetchUsers();
-  }, [location, page]);
+  }, [page]);
 
   // Fetch saved users
-  // const fetchSavedUsers = async () => {
-  //   setLoading(true);
-  //   try {
-  //     const res = await fetch("/api/github/", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({ userNames: savedUsers.map((u) => u.login) }),
-  //     });
-
-  //     if (res.ok) {
-  //       const data = await res.json();
-  //       if (data.user) {
-  //         setSavedUsers(data.user);
-  //         setSavedTotalPages(Math.ceil(data.user.length / savedUsersPerPage));
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error("Error fetching saved users info:", error);
-  //   }
-  //   setLoading(false);
-  // };
-
-
-  // const fetchSavedUsers = async () => {
-  //   setLoading(true);
-  //   try {
-  //     const res = await fetch("/api/github/", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({ userName: savedUsers.map((u) => u.login) }),
-  //     });
-
-  //     if (res.ok) {
-  //       const data = await res.json();
-  //       if (data.user) {
-  //         setSavedUsers(data.user.map(user => ({
-  //           ...user,
-  //           email: user.email || "Email hidden"
-  //         })));
-  //         setSavedTotalPages(Math.ceil(data.user.length / savedUsersPerPage));
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error("Error fetching saved users info:", error);
-  //   }
-  //   setLoading(false);
-  // };
-
-
   const fetchSavedUsers = async () => {
     setLoading(true);
     try {
@@ -140,8 +93,6 @@ export default function HelloPage() {
     setLoading(false);
   };
 
-
-  // Toggle Saved Users
   const toggleSavedUsers = () => {
     setShowSavedUsers(!showSavedUsers);
     if (!showSavedUsers) fetchSavedUsers();
@@ -161,7 +112,6 @@ export default function HelloPage() {
 
         if (res.ok) {
           setSavedUsers((prevUsers) => prevUsers.filter((u) => u.login !== user.login));
-          setForceUpdate((prev) => prev + 1); // Force re-render
         }
       } catch (error) {
         console.error("Error removing saved user:", error);
@@ -179,17 +129,19 @@ export default function HelloPage() {
         });
 
         if (res.ok) {
-          const text = await res.text();
-          const data = text ? JSON.parse(text) : {};
-
-          if (res.status === 201) {
-            setSavedUsers((prevUsers) => [...prevUsers, user]);
-            setForceUpdate((prev) => prev + 1); // Force re-render
-          }
+          setSavedUsers((prevUsers) => [...prevUsers, user]);
         }
       } catch (error) {
         console.error("Error saving user:", error);
       }
+    }
+  };
+
+  // Handle pressing "Enter" in location input
+  const handleLocationKeyPress = (e) => {
+    if (e.key === "Enter" && location.trim()) {
+      e.preventDefault();
+      fetchUsers();
     }
   };
 
@@ -223,7 +175,7 @@ export default function HelloPage() {
               placeholder="Enter location..."
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              onBlur={fetchUsers}
+              onKeyDown={handleLocationKeyPress}
               className="w-full p-3 border border-gray-300 rounded-lg"
             />
           </div>
@@ -256,10 +208,31 @@ export default function HelloPage() {
               </div>
             ))}
           </div>
+
+          {/* Pagination Controls */}
+          <div className="mt-4 flex justify-between">
+            <button disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</button>
+            <span>Page {page} of {totalPages}</span>
+            <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</button>
+          </div>
         </div>
       )}
 
-      {/* Saved Users with Pagination */}
+      {/* Saved Users with Pagination
+      {showSavedUsers && savedUsers.length > 0 && (
+        <div className="w-full mt-6">
+          <h2 className="text-xl font-semibold mb-3">⭐ Saved Users</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {savedUsers.slice((savedPage - 1) * savedUsersPerPage, savedPage * savedUsersPerPage).map((user) => (
+              <div key={user.id} className="p-4 border rounded-lg flex flex-col items-center">
+                <img src={user.avatar_url} alt={user.login} className="w-16 h-16 rounded-full mb-2" />
+                <p>{user.login}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )} */}
+
       {showSavedUsers && savedUsers.length > 0 && (
         <div className="w-full mt-6">
           <h2 className="text-xl font-semibold mb-3">⭐ Saved Users</h2>
@@ -280,9 +253,6 @@ export default function HelloPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
-
-      

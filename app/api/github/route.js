@@ -90,7 +90,8 @@ export async function POST(req) {
     let emails = [];
 
     // Check if the name is valid
-    const validUSAName = await checkName(user.name);
+    // const validUSAName = await checkName(user.name);
+    const validUSAName = true;
     if (validUSAName) {
       user.isUSAName = true;
       // If public email is available, use it

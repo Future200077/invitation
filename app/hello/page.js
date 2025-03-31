@@ -86,25 +86,54 @@ export default function HelloPage() {
   // };
 
 
+  // const fetchSavedUsers = async () => {
+  //   setLoading(true);
+  //   try {
+  //     const res = await fetch("/api/github/", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ userName: savedUsers.map((u) => u.login) }),
+  //     });
+
+  //     if (res.ok) {
+  //       const data = await res.json();
+  //       if (data.user) {
+  //         setSavedUsers(data.user.map(user => ({
+  //           ...user,
+  //           email: user.email || "Email hidden"
+  //         })));
+  //         setSavedTotalPages(Math.ceil(data.user.length / savedUsersPerPage));
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error("Error fetching saved users info:", error);
+  //   }
+  //   setLoading(false);
+  // };
+
+
   const fetchSavedUsers = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/github/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userNames: savedUsers.map((u) => u.login) }),
-      });
+      const updatedSavedUsers = [];
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) {
-          setSavedUsers(data.user.map(user => ({
-            ...user,
-            email: user.email || "Email hidden"
-          })));
-          setSavedTotalPages(Math.ceil(data.user.length / savedUsersPerPage));
+      for (const user of savedUsers) {
+        const res = await fetch("/api/github/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userName: user.login }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            updatedSavedUsers.push({ ...user, email: data.user.emails?.[0] || "No email" });
+          }
         }
       }
+
+      setSavedUsers(updatedSavedUsers);
+      setSavedTotalPages(Math.ceil(updatedSavedUsers.length / savedUsersPerPage));
     } catch (error) {
       console.error("Error fetching saved users info:", error);
     }

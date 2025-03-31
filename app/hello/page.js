@@ -10,6 +10,7 @@ export default function HelloPage() {
   const [savedUsers, setSavedUsers] = useState([]);
   const [showExtraFields, setShowExtraFields] = useState(false);
   const [showSavedUsers, setShowSavedUsers] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(0); // Force component re-render
 
   // Pagination for GitHub users
   const [page, setPage] = useState(1);
@@ -61,7 +62,30 @@ export default function HelloPage() {
     if (location) fetchUsers();
   }, [location, page]);
 
-  // Fetch saved users with details
+  // Fetch saved users
+  // const fetchSavedUsers = async () => {
+  //   setLoading(true);
+  //   try {
+  //     const res = await fetch("/api/github/", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ userNames: savedUsers.map((u) => u.login) }),
+  //     });
+
+  //     if (res.ok) {
+  //       const data = await res.json();
+  //       if (data.user) {
+  //         setSavedUsers(data.user);
+  //         setSavedTotalPages(Math.ceil(data.user.length / savedUsersPerPage));
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error("Error fetching saved users info:", error);
+  //   }
+  //   setLoading(false);
+  // };
+
+
   const fetchSavedUsers = async () => {
     setLoading(true);
     try {
@@ -74,7 +98,10 @@ export default function HelloPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.user) {
-          setSavedUsers(data.user);
+          setSavedUsers(data.user.map(user => ({
+            ...user,
+            email: user.email || "Email hidden"
+          })));
           setSavedTotalPages(Math.ceil(data.user.length / savedUsersPerPage));
         }
       }
@@ -84,39 +111,6 @@ export default function HelloPage() {
     setLoading(false);
   };
 
-  // const fetchSavedUsers = async () => {
-  //   if (savedUsers.length === 0) return; // Ensure there are users to fetch
-  //   setLoading(true);
-    
-  //   try {
-  //     const fetchedUsers = [];
-  
-  //     for (const user of savedUsers) {
-  //       const res = await fetch("/api/github/", {
-  //         method: "POST",
-  //         headers: { "Content-Type": "application/json" },
-  //         body: JSON.stringify({ userName: user.login }), // Send one userName per request
-  //       });
-  
-  //       if (res.ok) {
-  //         const data = await res.json();
-  //         if (data.user) {
-  //           fetchedUsers.push(data.user); // Collect user data
-  //         }
-  //       }
-  //     }
-  
-  //     if (fetchedUsers.length > 0) {
-  //       setSavedUsers(fetchedUsers);
-  //       setSavedTotalPages(Math.ceil(fetchedUsers.length / savedUsersPerPage));
-  //     }
-  //   } catch (error) {
-  //     console.error("Error fetching saved users info:", error);
-  //   }
-  
-  //   setLoading(false);
-  // };
-  
 
   // Toggle Saved Users
   const toggleSavedUsers = () => {
@@ -137,7 +131,8 @@ export default function HelloPage() {
         });
 
         if (res.ok) {
-          setSavedUsers(savedUsers.filter((u) => u.login !== user.login));
+          setSavedUsers((prevUsers) => prevUsers.filter((u) => u.login !== user.login));
+          setForceUpdate((prev) => prev + 1); // Force re-render
         }
       } catch (error) {
         console.error("Error removing saved user:", error);
@@ -159,7 +154,8 @@ export default function HelloPage() {
           const data = text ? JSON.parse(text) : {};
 
           if (res.status === 201) {
-            setSavedUsers([...savedUsers, user]);
+            setSavedUsers((prevUsers) => [...prevUsers, user]);
+            setForceUpdate((prev) => prev + 1); // Force re-render
           }
         }
       } catch (error) {
@@ -231,13 +227,6 @@ export default function HelloPage() {
               </div>
             ))}
           </div>
-
-          {/* Pagination Controls */}
-          <div className="mt-4 flex justify-between">
-            <button disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</button>
-            <span>Page {page} of {totalPages}</span>
-            <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</button>
-          </div>
         </div>
       )}
 
@@ -262,6 +251,9 @@ export default function HelloPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
+
+      

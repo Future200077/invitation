@@ -13,8 +13,9 @@ export default function HelloPage() {
 
   // Pagination for GitHub users
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const usersPerPage = 100;
+  const [totalPages, setTotalPages] = useState(100);
+  const usersPerPage = 10; // Changed to 10 users per page
+  const [inputPage, setInputPage] = useState("");
 
   // Pagination for Saved Users
   const [savedPage, setSavedPage] = useState(1);
@@ -48,11 +49,10 @@ export default function HelloPage() {
       );
       const data = await res.json();
       console.log(data)
-      console.log(data.items)
 
       if (data.items) {
         setUsers(data.items);
-        setTotalPages(Math.ceil(data.total_count / usersPerPage));
+        setTotalPages(Math.min(100, Math.ceil(data.total_count / usersPerPage))); // Limit to 100 pages
       }
     } catch (error) {
       console.error("Error fetching GitHub users:", error);
@@ -63,6 +63,19 @@ export default function HelloPage() {
   useEffect(() => {
     if (location) fetchUsers();
   }, [page]);
+
+  const handlePageInput = (e) => {
+    setInputPage(e.target.value);
+  };
+
+  const handlePageJump = (e) => {
+    if (e.key === "Enter") {
+      const newPage = Number(inputPage);
+      if (newPage >= 1 && newPage <= totalPages) {
+        setPage(newPage);
+      }
+    }
+  };
 
   // Fetch saved users
   const fetchSavedUsers = async () => {
@@ -145,6 +158,14 @@ export default function HelloPage() {
     }
   };
 
+  // Jump to specific page
+  // const handlePageJump = (e) => {
+  //   const newPage = Number(e.target.value);
+  //   if (newPage >= 1 && newPage <= totalPages) {
+  //     setPage(newPage);
+  //   }
+  // };
+
   return (
     <div className="flex flex-col items-center m-4 p-6 bg-white shadow-lg rounded-xl w-[50rem]">
       <h1 className="text-3xl font-bold text-gray-800 mb-4">GitHub Users</h1>
@@ -209,15 +230,23 @@ export default function HelloPage() {
             ))}
           </div>
 
-          {/* Pagination Controls */}
+          {/* Pagination Controls with Page Jump */}
           <div className="mt-4 flex justify-between">
             <button disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</button>
-            <span>Page {page} of {totalPages}</span>
+            <input
+              type="number"
+              value={inputPage}
+              placeholder={page}
+              min="1"
+              max={totalPages}
+              onChange={handlePageInput}
+              onKeyDown={handlePageJump}
+              className="w-16 text-center border border-gray-300 rounded-lg"
+            />
             <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</button>
           </div>
         </div>
       )}
-
       {/* Saved Users with Pagination
       {showSavedUsers && savedUsers.length > 0 && (
         <div className="w-full mt-6">

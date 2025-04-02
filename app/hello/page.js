@@ -13,7 +13,7 @@ export default function HelloPage() {
 
   // Pagination for GitHub users
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(100);
+  const [totalPages, setTotalPages] = useState(1);  // Changed to 1 initially 🔥
   const usersPerPage = 10; // Changed to 10 users per page
   const [inputPage, setInputPage] = useState("");
 
@@ -21,7 +21,6 @@ export default function HelloPage() {
   const [savedPage, setSavedPage] = useState(1);
   const [savedTotalPages, setSavedTotalPages] = useState(1);
   const savedUsersPerPage = 6;
-
 
   const resetState = () => {
     setUsername("");
@@ -59,9 +58,22 @@ export default function HelloPage() {
 
     const dateRanges = generateDateRanges();
     const apiRequests = dateRanges.map(async ({ start, end }) => {
-      const url = `https://api.github.com/search/users?q=location:${location}+created:${start}..${end}&per_page=100&page=1`;
+      const url = `https://api.github.com/search/users?q=location:${location}+created:${start}..${end}&per_page=100&page=${page}`;
+
       try {
         const res = await fetch(url);
+
+        // Handle rate-limiting by checking the response
+        if (!res.ok) {
+          if (res.status === 403) {
+            const retryAfter = res.headers.get("X-RateLimit-Reset");
+            console.warn("Rate limited! Try again after:", retryAfter);
+            return [];
+          }
+          console.error("Error fetching users for date range:", start, "to", end, res.status);
+          return [];
+        }
+
         const data = await res.json();
         return data.items || [];
       } catch (error) {
@@ -73,10 +85,15 @@ export default function HelloPage() {
     try {
       const results = await Promise.all(apiRequests);
       const mergedUsers = results.flat(); // Flatten the array of arrays
-      const uniqueUsers = Array.from(new Map(mergedUsers.map(user => [user.id, user])).values()); // Remove duplicates
 
+      // Calculate unique users based on ID 🔥
+      const uniqueUsers = Array.from(new Map(mergedUsers.map(user => [user.id, user])).values()); // Remove duplicates
       setUsers(uniqueUsers);
-      setTotalPages(Math.min(100, Math.ceil(uniqueUsers.length / usersPerPage))); // Limit to 100 pages
+      
+      // Calculate total pages 🔥
+      const totalResults = uniqueUsers.length;
+      setTotalPages(Math.ceil(totalResults / usersPerPage)); // Adjusted the calculation of total pages
+      setPage(1); // Reset to first page
     } catch (error) {
       console.error("Error fetching GitHub users:", error);
     }
@@ -84,31 +101,8 @@ export default function HelloPage() {
     setLoading(false);
   };
 
-  // Fetch GitHub users based on location
-  // const fetchUsers = async () => {
-  //   if (!location.trim()) return;
-  //   setLoading(true);
-  //   setUsers([]);
-
-  //   try {
-  //     const res = await fetch(
-  //       `https://api.github.com/search/users?q=location:${location}&per_page=${usersPerPage}&page=${page}`
-  //     );
-  //     const data = await res.json();
-  //     console.log(data)
-
-  //     if (data.items) {
-  //       setUsers(data.items);
-  //       setTotalPages(Math.min(100, Math.ceil(data.total_count / usersPerPage))); // Limit to 100 pages
-  //     }
-  //   } catch (error) {
-  //     console.error("Error fetching GitHub users:", error);
-  //   }
-  //   setLoading(false);
-  // };
-
   useEffect(() => {
-    if (location) fetchUsers();
+    if (location) fetchAllUsers();
   }, [page]);
 
   const handlePageInput = (e) => {
@@ -201,17 +195,9 @@ export default function HelloPage() {
   const handleLocationKeyPress = (e) => {
     if (e.key === "Enter" && location.trim()) {
       e.preventDefault();
-      fetchUsers();
+      fetchAllUsers();
     }
   };
-
-  // Jump to specific page
-  // const handlePageJump = (e) => {
-  //   const newPage = Number(e.target.value);
-  //   if (newPage >= 1 && newPage <= totalPages) {
-  //     setPage(newPage);
-  //   }
-  // };
 
   return (
     <div className="flex flex-col items-center m-4 p-6 bg-white shadow-lg rounded-xl w-[50rem]">
@@ -257,7 +243,7 @@ export default function HelloPage() {
         <div className="w-full mt-6">
           <h2 className="text-xl font-semibold mb-3">Users in {location}</h2>
           <div className="grid grid-cols-2 gap-4">
-            {users.map((user) => (
+            {users.slice((page - 1) * usersPerPage, page * usersPerPage).map((user) => (
               <div key={user.id} className="p-3 border rounded-lg flex justify-between">
                 <div className="flex items-center">
                   <img src={user.avatar_url} alt={user.login} className="w-12 h-12 rounded-full mr-3" />
@@ -278,54 +264,81 @@ export default function HelloPage() {
           </div>
 
           {/* Pagination Controls with Page Jump */}
-          <div className="mt-4 flex justify-between">
-            <button disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</button>
-            <input
-              type="number"
-              value={inputPage}
-              placeholder={page}
-              min="1"
-              max={totalPages}
-              onChange={handlePageInput}
-              onKeyDown={handlePageJump}
-              className="w-16 text-center border border-gray-300 rounded-lg"
-            />
-            <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</button>
+          <div className="flex justify-between items-center mt-4">
+            <button
+              onClick={() => setPage(Math.max(page - 1, 1))}
+              className="bg-gray-300 p-2 rounded-lg"
+              disabled={page === 1}
+            >
+              Prev
+            </button>
+            <div className="flex items-center">
+              <span>Page:</span>
+              <input
+                type="number"
+                value={inputPage || page}
+                onChange={handlePageInput}
+                onKeyDown={handlePageJump}
+                className="w-16 p-2 ml-2 border rounded-lg text-center"
+                min={1}
+                max={totalPages}
+              />
+              <span>/{totalPages}</span>
+            </div>
+            <button
+              onClick={() => setPage(Math.min(page + 1, totalPages))}
+              className="bg-gray-300 p-2 rounded-lg"
+              disabled={page === totalPages}
+            >
+              Next
+            </button>
           </div>
         </div>
       )}
-      {/* Saved Users with Pagination
-      {showSavedUsers && savedUsers.length > 0 && (
-        <div className="w-full mt-6">
-          <h2 className="text-xl font-semibold mb-3">⭐ Saved Users</h2>
-          <div className="grid grid-cols-2 gap-4">
-            {savedUsers.slice((savedPage - 1) * savedUsersPerPage, savedPage * savedUsersPerPage).map((user) => (
-              <div key={user.id} className="p-4 border rounded-lg flex flex-col items-center">
-                <img src={user.avatar_url} alt={user.login} className="w-16 h-16 rounded-full mb-2" />
-                <p>{user.login}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )} */}
 
+      {/* Saved Users */}
       {showSavedUsers && savedUsers.length > 0 && (
         <div className="w-full mt-6">
-          <h2 className="text-xl font-semibold mb-3">⭐ Saved Users</h2>
+          <h2 className="text-xl font-semibold mb-3">Saved Users</h2>
           <div className="grid grid-cols-2 gap-4">
             {savedUsers.slice((savedPage - 1) * savedUsersPerPage, savedPage * savedUsersPerPage).map((user) => (
-              <div key={user.id} className="p-4 border rounded-lg flex flex-col items-center">
-                <img src={user.avatar_url} alt={user.login} className="w-16 h-16 rounded-full mb-2" />
-                <p>{user.login} ({user.email || "No email"})</p>
+              <div key={user.login} className="p-3 border rounded-lg flex justify-between">
+                <div className="flex items-center">
+                  <img src={user.avatar_url} alt={user.login} className="w-12 h-12 rounded-full mr-3" />
+                  <a href={user.html_url} className="text-blue-500">{user.login}</a>
+                </div>
               </div>
             ))}
           </div>
 
-          {/* Pagination Controls */}
-          <div className="mt-4 flex justify-between">
-            <button disabled={savedPage === 1} onClick={() => setSavedPage(savedPage - 1)}>Prev</button>
-            <span>Page {savedPage} of {savedTotalPages}</span>
-            <button disabled={savedPage === savedTotalPages} onClick={() => setSavedPage(savedPage + 1)}>Next</button>
+          {/* Saved Users Pagination */}
+          <div className="flex justify-between items-center mt-4">
+            <button
+              onClick={() => setSavedPage(Math.max(savedPage - 1, 1))}
+              className="bg-gray-300 p-2 rounded-lg"
+              disabled={savedPage === 1}
+            >
+              Prev
+            </button>
+            <div className="flex items-center">
+              <span>Page:</span>
+              <input
+                type="number"
+                value={savedPage}
+                onChange={(e) => setSavedPage(Number(e.target.value))}
+                className="w-16 p-2 ml-2 border rounded-lg text-center"
+                min={1}
+                max={savedTotalPages}
+              />
+              <span>/{savedTotalPages}</span>
+            </div>
+            <button
+              onClick={() => setSavedPage(Math.min(savedPage + 1, savedTotalPages))}
+              className="bg-gray-300 p-2 rounded-lg"
+              disabled={savedPage === savedTotalPages}
+            >
+              Next
+            </button>
           </div>
         </div>
       )}

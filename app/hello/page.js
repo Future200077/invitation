@@ -22,6 +22,7 @@ export default function HelloPage() {
   const [savedTotalPages, setSavedTotalPages] = useState(1);
   const savedUsersPerPage = 6;
 
+
   const resetState = () => {
     setUsername("");
     setLocation("");
@@ -37,28 +38,74 @@ export default function HelloPage() {
     setShowExtraFields(true);
   };
 
-  // Fetch GitHub users based on location
-  const fetchUsers = async () => {
+  // Generate date ranges from 2018-01 to 2024-12 (one per month)
+  const generateDateRanges = () => {
+    const dateRanges = [];
+    for (let year = 2018; year <= 2024; year++) {
+      for (let month = 1; month <= 12; month++) {
+        const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+        const endDate = `${year}-${String(month).padStart(2, "0")}-31`;
+        dateRanges.push({ start: startDate, end: endDate });
+      }
+    }
+    return dateRanges;
+  };
+
+  // Fetch all GitHub users in parallel with different created date ranges
+  const fetchAllUsers = async () => {
     if (!location.trim()) return;
     setLoading(true);
     setUsers([]);
 
-    try {
-      const res = await fetch(
-        `https://api.github.com/search/users?q=location:${location}&per_page=${usersPerPage}&page=${page}`
-      );
-      const data = await res.json();
-      console.log(data)
-
-      if (data.items) {
-        setUsers(data.items);
-        setTotalPages(Math.min(100, Math.ceil(data.total_count / usersPerPage))); // Limit to 100 pages
+    const dateRanges = generateDateRanges();
+    const apiRequests = dateRanges.map(async ({ start, end }) => {
+      const url = `https://api.github.com/search/users?q=location:${location}+created:${start}..${end}&per_page=100&page=1`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        return data.items || [];
+      } catch (error) {
+        console.error("Error fetching users for date range:", start, "to", end, error);
+        return [];
       }
+    });
+
+    try {
+      const results = await Promise.all(apiRequests);
+      const mergedUsers = results.flat(); // Flatten the array of arrays
+      const uniqueUsers = Array.from(new Map(mergedUsers.map(user => [user.id, user])).values()); // Remove duplicates
+
+      setUsers(uniqueUsers);
+      setTotalPages(Math.min(100, Math.ceil(uniqueUsers.length / usersPerPage))); // Limit to 100 pages
     } catch (error) {
       console.error("Error fetching GitHub users:", error);
     }
+
     setLoading(false);
   };
+
+  // Fetch GitHub users based on location
+  // const fetchUsers = async () => {
+  //   if (!location.trim()) return;
+  //   setLoading(true);
+  //   setUsers([]);
+
+  //   try {
+  //     const res = await fetch(
+  //       `https://api.github.com/search/users?q=location:${location}&per_page=${usersPerPage}&page=${page}`
+  //     );
+  //     const data = await res.json();
+  //     console.log(data)
+
+  //     if (data.items) {
+  //       setUsers(data.items);
+  //       setTotalPages(Math.min(100, Math.ceil(data.total_count / usersPerPage))); // Limit to 100 pages
+  //     }
+  //   } catch (error) {
+  //     console.error("Error fetching GitHub users:", error);
+  //   }
+  //   setLoading(false);
+  // };
 
   useEffect(() => {
     if (location) fetchUsers();
@@ -76,7 +123,7 @@ export default function HelloPage() {
       }
     }
   };
-
+  
   // Fetch saved users
   const fetchSavedUsers = async () => {
     setLoading(true);
